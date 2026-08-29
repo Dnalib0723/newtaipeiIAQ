@@ -1,55 +1,44 @@
-# 部署到 Cloudflare Pages（免費，不需跑 Python）
+# 部署到 Cloudflare Workers（免費，不需跑 Python）
 
-## 檔案結構（已準備好）
+## 檔案結構
 
 ```
-index.html            ← 儀表板（已把 API 改成 /api）
-logo.png
-functions/
-  api/
-    login.js          ← 取代 proxy_server.py 的 /api/login
-    devices.js        ← 取代 /api/devices
-    history.js        ← 取代 /api/history
+wrangler.jsonc        ← Cloudflare 設定
+src/index.js          ← Worker：/api/* 轉發到 eb.ecobear.tw，其餘走靜態檔案
+public/
+  index.html          ← 儀表板（API 指向同源 /api）
+  logo.png
+proxy_server.py 等    ← 本機用，部署不需要
 ```
 
-`functions/` 是 Cloudflare Pages 的慣例資料夾，部署後
-`/api/login`、`/api/devices`、`/api/history` 會自動由這三支 JS 處理，
-跟頁面同一個網域，所以沒有 CORS 問題，也不用開伺服器。
+`src/index.js` 完整取代了 `proxy_server.py`：處理 `/api/login`、`/api/devices`、
+`/api/history`，其他路徑交給 `ASSETS` binding 提供 `public/` 裡的靜態檔。
+跟頁面同一個網域，所以沒有 CORS 問題。
 
-## 方法 A：用 Git（推薦，之後改檔會自動更新）
+## 部署（GitHub + Cloudflare 自動建置）
 
-1. 把這個資料夾推到 GitHub（新開一個 repo 即可）。
-2. 到 https://dash.cloudflare.com → Workers & Pages → Create → Pages → Connect to Git。
-3. 選那個 repo，Build command 留空，Output directory 填 `/`（或留空）。
-4. Deploy。完成後會給你一個網址：`https://你的專案.pages.dev`
-5. 把這個網址給大家即可。
+1. 程式碼已在 https://github.com/Dnalib0723/newtaipeiIAQ （branch `main`）
+2. Cloudflare Dashboard → **Workers & Pages** → **Create application**
+3. 選 **Import a repository**（連接 GitHub）→ 選 `newtaipeiIAQ`
+4. Cloudflare 會偵測到 `wrangler.jsonc`：
+   - Build command：**留空**
+   - Deploy command：`npx wrangler deploy`（預設值，不用改）
+5. **Save and Deploy**，等約 1 分鐘
+6. 拿到網址 `https://newtaipeiiaq.<你的子網域>.workers.dev`
 
-## 方法 B：不想用 Git（指令上傳一次）
+之後改東西 → `git push` → Cloudflare 自動重新部署。
 
-需要 Node.js。在這個資料夾執行：
+## 本機開發（可選）
 
 ```powershell
 npm install -g wrangler
-wrangler login
-wrangler pages deploy . --project-name iaq-dashboard
+wrangler dev
 ```
 
-之後每次要更新就再跑一次最後那行。
+開 `http://localhost:8787`，行為跟線上一致。
 
-## 換 Netlify / Vercel？
+## 注意事項
 
-- Netlify：把 `functions/api/*.js` 改放到 `netlify/functions/`，
-  並加 `netlify.toml` 做 `/api/* → /.netlify/functions/:splat` 轉址。
-- Vercel：把三支檔案改放到 `api/`（檔名即路由），語法改成
-  `export default function handler(req, res) { ... }`。
-- 三家免費額度對這個用途都綽綽有餘。
-
-## 注意事項（重要）
-
-1. **每位觀看者仍需用 EcoBear 帳號登入**。目前架構是每個人各自登入、
-   token 存在自己瀏覽器。若要「完全公開、免登入」，需要在 function 端
-   寫死一組唯讀帳號或 token（安全性取捨，另外處理）。
-2. 登入帳密會經過 Cloudflare（或你選的平台）轉發到 `eb.ecobear.tw`，
-   信任模型跟原本本機 proxy 一樣，只是換成雲端平台。
-3. `proxy_server.py`、`generate_pdf.py`、`startup_guide.*` 部署時都用不到，
-   可留著本機用。
+1. **每位觀看者仍需用 EcoBear 帳號登入**（token 各自存在自己瀏覽器）。
+   若要「完全公開、免登入」，需在 `src/index.js` 寫死一組唯讀 token。
+2. 登入帳密經 Cloudflare 轉發到 `eb.ecobear.tw`，信任模型同原本本機 proxy。
