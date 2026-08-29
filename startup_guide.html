@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { margin: 20mm 18mm; }
+  body {
+    font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', Arial, sans-serif;
+    max-width: 860px; margin: 0 auto; color: #1e293b; line-height: 1.75; font-size: 13px;
+  }
+  h1 { color: #1e40af; border-bottom: 3px solid #1e40af; padding-bottom: 10px;
+       font-size: 22px; margin-bottom: 24px; }
+  h2 { color: #1d4ed8; font-size: 16px; margin-top: 32px; margin-bottom: 8px;
+       border-left: 4px solid #3b82f6; padding-left: 10px; }
+  h3 { color: #2563eb; font-size: 14px; }
+  pre { background: #1e293b; color: #e2e8f0; padding: 14px 18px; border-radius: 8px;
+        font-family: 'Consolas','Courier New',monospace; font-size: 12px; line-height: 1.5; margin: 10px 0; }
+  code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px;
+         font-family: 'Consolas','Courier New',monospace; font-size: 12px; color: #0f172a; }
+  pre code { background: none; padding: 0; color: inherit; border-radius: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 12px; }
+  th { background: #1e40af; color: white; padding: 8px 14px; text-align: left; }
+  td { border: 1px solid #cbd5e1; padding: 7px 14px; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  blockquote { border-left: 4px solid #f59e0b; margin: 12px 0; padding: 8px 16px;
+               background: #fffbeb; color: #92400e; border-radius: 0 6px 6px 0; }
+  hr { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
+  em { color: #64748b; }
+</style>
+</head>
+<body>
+<h1>EB05 IAQ Dashboard 啟動指南</h1>
+<h2>前置需求</h2>
+<ul>
+<li>Python 3.8 以上版本</li>
+<li>瀏覽器（Chrome 或 Edge）</li>
+</ul>
+<hr />
+<h2>步驟 1：安裝 Python 套件</h2>
+<p>在 PowerShell 中執行（僅需安裝一次）：</p>
+<pre><code class="language-powershell">pip install flask flask-cors requests
+</code></pre>
+<hr />
+<h2>步驟 2：切換到專案資料夾</h2>
+<pre><code class="language-powershell">cd &quot;C:\Users\USER\Desktop\dashborad\dashboardv2&quot;
+</code></pre>
+<hr />
+<h2>步驟 3：啟動 Proxy Server</h2>
+<pre><code class="language-powershell">python proxy_server.py
+</code></pre>
+<p>啟動成功後，終端機會顯示：</p>
+<pre><code>==================================================
+EB05 Dashboard Proxy Server
+==================================================
+開啟瀏覽器前往: http://localhost:5050
+按 Ctrl+C 停止伺服器
+==================================================
+ * Running on http://127.0.0.1:5050
+</code></pre>
+<blockquote>
+<p><strong>注意：保持此 PowerShell 視窗開著，不要關閉。</strong></p>
+</blockquote>
+<hr />
+<h2>步驟 4：開啟瀏覽器</h2>
+<p>在瀏覽器網址列輸入：</p>
+<pre><code>http://localhost:5050
+</code></pre>
+<hr />
+<h2>步驟 5：登入</h2>
+<table>
+<thead>
+<tr>
+<th>欄位</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>電子郵件</td>
+<td>你的 EcoBear 帳號 email</td>
+</tr>
+<tr>
+<td>密碼</td>
+<td>你的 EcoBear 密碼</td>
+</tr>
+</tbody>
+</table>
+<p>登入後系統自動載入裝置列表與即時感測數據。</p>
+<hr />
+<h2>功能說明</h2>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>側邊欄裝置列表</td>
+<td>顯示帳號下所有 EB05 裝置，點擊切換</td>
+</tr>
+<tr>
+<td>即時數據卡片</td>
+<td>CO₂、PM10、PM2.5、HCHO、CO、TVOC、溫度、濕度</td>
+</tr>
+<tr>
+<td>歷史趨勢圖表</td>
+<td>可選擇污染物與時間範圍（今天 / 7天 / 30天）</td>
+</tr>
+<tr>
+<td>下載 CSV</td>
+<td>匯出目前選取污染物的歷史資料</td>
+</tr>
+<tr>
+<td>自動刷新</td>
+<td>每 60 秒自動重新抓取最新數據</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>停止伺服器</h2>
+<p>在 PowerShell 視窗按下：</p>
+<pre><code>Ctrl + C
+</code></pre>
+<hr />
+<h2>下次使用（套件已安裝，僅需以下兩步）</h2>
+<pre><code class="language-powershell">cd &quot;C:\Users\USER\Desktop\dashborad\dashboardv2&quot;
+python proxy_server.py
+</code></pre>
+<p>開啟瀏覽器前往 <code>http://localhost:5050</code> 即可。</p>
+<hr />
+<h2>注意事項</h2>
+<ul>
+<li>Proxy server 必須持續執行，儀表板才能正常顯示資料</li>
+<li>Token 會儲存在瀏覽器 localStorage，下次開啟不需重新登入</li>
+<li>如需登出，點擊側邊欄右下角的登出按鈕</li>
+<li>警戒線標準：CO₂ 1000 ppm、PM10 75 μg/m³、PM2.5 35 μg/m³、HCHO 80 ppb、CO 9 ppm、TVOC 560 ppb</li>
+</ul>
+<hr />
+<p><em>© 2026 新北市政府環境保護局 · 室內空氣品質雲端平台</em></p>
+</body>
+</html>

@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新北市 IAQ 監測儀表板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            overflow-x: hidden;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        sub {
+            bottom: -0.2em;
+            font-size: 0.65em;
+            line-height: 0;
+            position: relative;
+            vertical-align: baseline;
+            margin-left: 0.05em;
+        }
+        .spin { animation: spin 0.6s linear; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 custom-scrollbar">
+
+    <!-- ===== LOGIN MODAL ===== -->
+    <div id="login-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl mx-4">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-10 h-20 flex items-center justify-center overflow-hidden">
+                    <img src="logo.png" alt="Logo" class="w-full h-auto object-contain">
+                </div>
+                <div>
+                    <p class="font-black text-xl tracking-tight">IAQ AirBOX</p>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">新北市室內空氣品質平台</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">電子郵件</label>
+                    <input id="login-email" type="email" autocomplete="email"
+                        class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition-all"
+                        placeholder="example@email.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">密碼</label>
+                    <input id="login-password" type="password" autocomplete="current-password"
+                        class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition-all"
+                        placeholder="••••••••">
+                </div>
+                <div id="login-error" class="hidden text-sm text-red-600 font-bold bg-red-50 rounded-xl px-4 py-3 border border-red-100"></div>
+                <button id="btn-login"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shadow-blue-500/20">
+                    登入
+                </button>
+            </div>
+            <p class="text-center text-xs text-slate-400 mt-6">請確認 proxy server 正在執行於 localhost:5050</p>
+        </div>
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-slate-900 text-white flex flex-col shadow-xl z-50 transition-transform duration-300 ease-in-out">
+        <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+            <div class="w-10 h-20 flex items-center justify-center overflow-hidden">
+                <img src="logo.png" alt="Logo" class="w-full h-auto object-contain">
+            </div>
+            <span class="font-bold text-xl tracking-tight uppercase">IAQ AirBOX</span>
+        </div>
+
+        <nav class="flex-1 p-4 mt-4 overflow-y-auto custom-scrollbar">
+            <div class="text-xs font-semibold text-slate-500 uppercase px-3 mb-4 tracking-widest">主要選單</div>
+            <ul id="sidebar-nav-list" class="space-y-2">
+                <li>
+                    <div class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500">
+                        <i data-lucide="loader" size="18" class="animate-spin"></i>
+                        <span class="text-sm font-medium">載入裝置中...</span>
+                    </div>
+                </li>
+            </ul>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800">
+            <div class="bg-slate-800/50 rounded-2xl p-4 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-black text-sm flex-shrink-0">A</div>
+                <div class="overflow-hidden flex-1">
+                    <p id="sidebar-user-email" class="text-sm font-bold truncate">管理者帳號</p>
+                    <p class="text-[10px] text-slate-500 uppercase font-black">Admin Level 1</p>
+                </div>
+                <button id="btn-logout" title="登出"
+                    class="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-700 transition-all flex-shrink-0">
+                    <i data-lucide="log-out" size="16"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main id="main-content" class="ml-64 p-4 lg:p-8 min-h-screen transition-all duration-300 ease-in-out">
+
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+            <div class="flex items-center gap-4">
+                <button id="toggle-sidebar" class="p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 transition-all active:scale-95 group">
+                    <i data-lucide="menu" size="24" class="text-slate-600 group-hover:text-blue-600"></i>
+                </button>
+                <div>
+                    <h1 class="text-3xl font-black text-slate-800 tracking-tight">新北市室內空氣品質雲端平台</h1>
+                    <div class="flex flex-wrap items-center gap-x-6 gap-y-3 text-slate-500 mt-3">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider animate-pulse">Live</span>
+                            <p class="text-sm flex items-center gap-1.5 font-bold">
+                                <i data-lucide="map-pin" size="14" class="text-blue-500"></i>
+                                <span id="current-device-alias">載入裝置中...</span>
+                            </p>
+                            <span id="device-status" class="hidden text-xs font-bold px-2 py-0.5 rounded-full"></span>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm font-black text-slate-500 bg-white px-4 py-1.5 rounded-full border border-slate-200 shadow-sm">
+                            <i data-lucide="clock" size="14" class="text-indigo-500"></i>
+                            <span id="real-time-clock" class="tabular-nums italic">載入時間中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button id="btn-refresh" class="p-3 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-slate-50 transition-all active:scale-95 group" title="重新整理">
+                    <i data-lucide="refresh-cw" size="20" class="text-slate-600 transition-transform duration-500"></i>
+                </button>
+                <button class="p-3 bg-white border border-slate-200 rounded-xl shadow-sm relative hover:bg-slate-50 transition-all active:scale-95">
+                    <i data-lucide="bell" size="20" class="text-slate-600"></i>
+                    <span class="absolute top-3 right-3 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Metric Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">
+
+            <div class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all group flex flex-col">
+                <div class="mb-5">
+                    <div class="inline-flex p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                        <i data-lucide="wind" size="22"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1.5 mt-auto">
+                    <h3 id="val-co2" class="text-5xl font-black text-slate-900 tabular-nums tracking-tighter">--</h3>
+                    <span class="text-slate-400 font-black text-sm">ppm</span>
+                </div>
+                <p class="text-slate-400 text-[10px] mt-3 font-black tracking-[0.2em] uppercase">二氧化碳 (CO<sub>2</sub>)</p>
+            </div>
+
+            <div class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all group flex flex-col">
+                <div class="mb-5">
+                    <div class="inline-flex p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                        <i data-lucide="flame" size="22"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1.5 mt-auto">
+                    <h3 id="val-pm10" class="text-5xl font-black text-slate-900 tabular-nums tracking-tighter">--</h3>
+                    <span class="text-slate-400 font-black text-sm">μg/m³</span>
+                </div>
+                <p class="text-slate-400 text-[10px] mt-3 font-black tracking-[0.2em] uppercase">懸浮微粒 (PM<sub>10</sub>)</p>
+            </div>
+
+            <div class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all group flex flex-col">
+                <div class="mb-5">
+                    <div class="inline-flex p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                        <i data-lucide="flask-conical" size="22"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1.5 mt-auto">
+                    <h3 id="val-hcho" class="text-5xl font-black text-slate-900 tabular-nums tracking-tighter">--</h3>
+                    <span class="text-slate-400 font-black text-sm">ppb</span>
+                </div>
+                <p class="text-slate-400 text-[10px] mt-3 font-black tracking-[0.2em] uppercase">甲醛 (HCHO)</p>
+            </div>
+
+            <div class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all group flex flex-col">
+                <div class="mb-5">
+                    <div class="inline-flex p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                        <i data-lucide="wind" size="22"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1.5 mt-auto">
+                    <h3 id="val-co" class="text-5xl font-black text-slate-900 tabular-nums tracking-tighter">--</h3>
+                    <span class="text-slate-400 font-black text-sm">ppm</span>
+                </div>
+                <p class="text-slate-400 text-[10px] mt-3 font-black tracking-[0.2em] uppercase">一氧化碳 (CO)</p>
+            </div>
+
+            <div class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all group flex flex-col">
+                <div class="mb-5">
+                    <div class="inline-flex p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                        <i data-lucide="flame" size="22"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1.5 mt-auto">
+                    <h3 id="val-pm25" class="text-5xl font-black text-slate-900 tabular-nums tracking-tighter">--</h3>
+                    <span class="text-slate-400 font-black text-sm">μg/m³</span>
+                </div>
+                <p class="text-slate-400 text-[10px] mt-3 font-black tracking-[0.2em] uppercase">細懸浮微粒 (PM<sub>2.5</sub>)</p>
+            </div>
+
+            <div class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/5 transition-all group flex flex-col">
+                <div class="mb-5">
+                    <div class="inline-flex p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                        <i data-lucide="flask-conical" size="22"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1.5 mt-auto">
+                    <h3 id="val-tvoc" class="text-5xl font-black text-slate-900 tabular-nums tracking-tighter">--</h3>
+                    <span class="text-slate-400 font-black text-sm">ppb</span>
+                </div>
+                <p class="text-slate-400 text-[10px] mt-3 font-black tracking-[0.2em] uppercase">總揮發物 (TVOC)</p>
+            </div>
+        </div>
+
+        <!-- Temperature / Humidity Banner -->
+        <div class="bg-slate-900 text-white rounded-[2rem] px-10 py-5 shadow-xl mb-8 flex items-center justify-center gap-16 group">
+            <div class="flex items-center gap-4">
+                <i data-lucide="thermometer" class="text-orange-400 group-hover:scale-110 transition-transform" size="28"></i>
+                <div>
+                    <p id="val-temperature" class="text-2xl font-black tabular-nums">--°C</p>
+                    <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">溫度</p>
+                </div>
+            </div>
+            <div class="w-px h-10 bg-slate-700"></div>
+            <div class="flex items-center gap-4">
+                <i data-lucide="droplets" class="text-cyan-400 group-hover:scale-110 transition-transform" size="28"></i>
+                <div>
+                    <p id="val-humidity" class="text-2xl font-black tabular-nums">--%</p>
+                    <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">相對濕度</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Chart -->
+        <div class="bg-white rounded-[3rem] p-8 lg:p-12 shadow-sm border border-slate-100">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
+                <div class="flex items-center gap-5">
+                    <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center font-bold">
+                        <i data-lucide="file-spreadsheet" size="32"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-2xl text-slate-800 tracking-tight">歷史趨勢分析與數據匯出</h3>
+                        <p class="text-sm text-slate-400 mt-1 font-medium">選取污染物與範圍後可下載 CSV 報表</p>
+                    </div>
+                </div>
+                <button id="btn-download-csv"
+                    class="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3.5 rounded-2xl font-black text-sm shadow-xl shadow-emerald-500/20 transition-all flex items-center gap-3 active:scale-95">
+                    <i data-lucide="download" size="18"></i> 下載 CSV
+                </button>
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+                <div class="flex flex-wrap gap-2" id="pollutant-tabs">
+                    <button data-pollutant="CO2"   class="tab-btn px-4 py-1.5 rounded-full text-xs font-black border border-slate-200 text-slate-500 hover:border-blue-400 hover:text-blue-600 transition-all">CO<sub>2</sub></button>
+                    <button data-pollutant="CO"    class="tab-btn px-4 py-1.5 rounded-full text-xs font-black border border-slate-200 text-slate-500 hover:border-blue-400 hover:text-blue-600 transition-all">CO</button>
+                    <button data-pollutant="PM10"  class="tab-btn px-4 py-1.5 rounded-full text-xs font-black border border-slate-200 text-slate-500 hover:border-blue-400 hover:text-blue-600 transition-all">PM<sub>10</sub></button>
+                    <button data-pollutant="PM2.5" class="tab-btn px-4 py-1.5 rounded-full text-xs font-black border border-slate-200 text-slate-500 hover:border-blue-400 hover:text-blue-600 transition-all">PM<sub>2.5</sub></button>
+                    <button data-pollutant="HCHO"  class="tab-btn px-4 py-1.5 rounded-full text-xs font-black border border-slate-200 text-slate-500 hover:border-blue-400 hover:text-blue-600 transition-all">HCHO</button>
+                    <button data-pollutant="TVOC"  class="tab-btn px-4 py-1.5 rounded-full text-xs font-black border border-slate-200 text-slate-500 hover:border-blue-400 hover:text-blue-600 transition-all">TVOC</button>
+                </div>
+
+                <div class="flex gap-1 bg-slate-100 rounded-xl p-1" id="range-tabs">
+                    <button data-range="1"  class="range-btn px-4 py-1.5 rounded-lg text-xs font-black text-slate-500 transition-all">今天</button>
+                    <button data-range="7"  class="range-btn px-4 py-1.5 rounded-lg text-xs font-black text-slate-500 transition-all">7 天</button>
+                    <button data-range="14" class="range-btn px-4 py-1.5 rounded-lg text-xs font-black text-slate-500 transition-all">14 天</button>
+                    <button data-range="30" class="range-btn px-4 py-1.5 rounded-lg text-xs font-black text-slate-500 transition-all">30 天</button>
+                </div>
+            </div>
+
+            <div class="relative h-72">
+                <canvas id="iaq-chart"></canvas>
+            </div>
+        </div>
+
+        <footer class="mt-20 text-center text-slate-400 text-xs pb-16 pt-10 border-t border-slate-100">
+            <p class="font-bold">© 2026 新北市政府環境保護局 · 室內空氣品質雲端平台</p>
+        </footer>
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        // ===== Config =====
+        const API = 'http://localhost:5050/api';
+
+        // ===== State =====
+        let token = localStorage.getItem('accessToken') || '';
+        let devices = [];
+        let activeDeviceIdx = 0;
+        let autoRefreshTimer = null;
+        let currentPollutant = 'CO2';
+        let currentRange = 1;
+        let historyData = null;
+
+        // ===== Pollutant definitions =====
+        const POLLUTANT_META = {
+            CO2:    { label: 'CO₂ (ppm)',     unit: 'ppm',   color: '#6366f1', apiKey: 'co2',  min: 300, max: 1200 },
+            CO:     { label: 'CO (ppm)',       unit: 'ppm',   color: '#f59e0b', apiKey: 'co',   min: 0,   max: 12   },
+            PM10:   { label: 'PM10 (μg/m³)',  unit: 'μg/m³', color: '#06b6d4', apiKey: 'pm10', min: 0,   max: 150  },
+            'PM2.5':{ label: 'PM2.5 (μg/m³)', unit: 'μg/m³', color: '#3b82f6', apiKey: 'pm25', min: 0,   max: 75   },
+            HCHO:   { label: 'HCHO (ppb)',     unit: 'ppb',   color: '#10b981', apiKey: 'hcho', min: 0,   max: 200  },
+            TVOC:   { label: 'TVOC (ppb)',     unit: 'ppb',   color: '#8b5cf6', apiKey: 'tvoc', min: 0,   max: 1000 },
+        };
+
+        const THRESHOLDS = {
+            CO2:     1000,
+            CO:      9,
+            PM10:    75,
+            'PM2.5': 35,
+            HCHO:    80,   // ppb
+            TVOC:    560,  // ppb
+        };
+
+        // ===== Clock =====
+        function updateClock() {
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            document.getElementById('real-time-clock').textContent =
+                `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // ===== Sidebar toggle =====
+        const sidebarEl   = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+        const toggleBtn   = document.getElementById('toggle-sidebar');
+        let isSidebarVisible = true;
+
+        toggleBtn.addEventListener('click', () => {
+            if (isSidebarVisible) {
+                sidebarEl.style.transform = 'translateX(-100%)';
+                mainContent.style.marginLeft = '0';
+            } else {
+                sidebarEl.style.transform = 'translateX(0)';
+                if (window.innerWidth >= 1024) mainContent.style.marginLeft = '16rem';
+            }
+            isSidebarVisible = !isSidebarVisible;
+        });
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth < 1024) {
+                sidebarEl.style.transform = 'translateX(-100%)';
+                mainContent.style.marginLeft = '0';
+                isSidebarVisible = false;
+            } else {
+                sidebarEl.style.transform = 'translateX(0)';
+                mainContent.style.marginLeft = '16rem';
+                isSidebarVisible = true;
+            }
+        });
+
+        // ===== Login =====
+        function showLoginError(msg) {
+            const el = document.getElementById('login-error');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        async function handleLogin() {
+            const email    = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+            const btnLogin = document.getElementById('btn-login');
+
+            if (!email || !password) { showLoginError('請輸入電子郵件和密碼'); return; }
+
+            btnLogin.textContent = '登入中...';
+            btnLogin.disabled = true;
+            document.getElementById('login-error').classList.add('hidden');
+
+            try {
+                const res  = await fetch(`${API}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+
+                console.log('Login response:', data);
+                const tok = (data.data && data.data.accessToken) || data.accessToken || data.token || '';
+                const ok  = data.ret === 'RET_OK' || data.ret === 'RET_SUCCESS';
+                if (ok && tok) {
+                    token = tok;
+                    localStorage.setItem('accessToken', token);
+                    document.getElementById('sidebar-user-email').textContent = email;
+                    document.getElementById('login-modal').classList.add('hidden');
+                    await loadDashboard();
+                } else {
+                    showLoginError(data.retDescription || '登入失敗，請確認帳號密碼');
+                }
+            } catch (e) {
+                showLoginError('無法連線至伺服器，請確認 proxy server 正在執行 (localhost:5050)');
+            } finally {
+                btnLogin.textContent = '登入';
+                btnLogin.disabled = false;
+            }
+        }
+
+        document.getElementById('btn-login').addEventListener('click', handleLogin);
+        document.getElementById('login-email').addEventListener('keydown', e => {
+            if (e.key === 'Enter') document.getElementById('login-password').focus();
+        });
+        document.getElementById('login-password').addEventListener('keydown', e => {
+            if (e.key === 'Enter') handleLogin();
+        });
+
+        // ===== Logout =====
+        function logout() {
+            token = '';
+            localStorage.removeItem('accessToken');
+            if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+            devices = [];
+            document.getElementById('login-modal').classList.remove('hidden');
+            document.getElementById('login-error').classList.add('hidden');
+        }
+
+        document.getElementById('btn-logout').addEventListener('click', logout);
+
+        // ===== API calls =====
+        async function fetchDevices() {
+            const res = await fetch(`${API}/devices`, {
+                method: 'POST',
+                headers: { 'accessToken': token }
+            });
+            if (res.status === 401) { logout(); return null; }
+            const data = await res.json();
+            if (data.ret !== 'RET_OK' && data.ret !== 'RET_SUCCESS') throw new Error(data.retDescription || 'fetchDevices failed');
+            return (Array.isArray(data.data) ? data.data : null) ||
+                   data.devices || data.device || [];
+        }
+
+        async function fetchHistory(uuid, from, to, group) {
+            const params = new URLSearchParams({
+                uuid: String(uuid),
+                from: String(from),
+                to:   String(to),
+                group: String(group)
+            });
+            const res = await fetch(`${API}/history?${params}`, {
+                headers: { 'accessToken': token }
+            });
+            if (res.status === 401) { logout(); return null; }
+            const data = await res.json();
+            if (data.ret !== 'RET_OK' && data.ret !== 'RET_SUCCESS') throw new Error(data.retDescription || 'fetchHistory failed');
+            return (Array.isArray(data.data) ? data.data : null) ||
+                   data.histories || data.history || [];
+        }
+
+        function getHistoryTimeRange(rangeDays) {
+            const now  = Math.floor(Date.now() / 1000);
+            const from = now - rangeDays * 86400;
+            const group = 60;
+            return { from, to: now, group };
+        }
+
+        // ===== UI: cards =====
+        function fmt(v, dec) {
+            return v != null && v !== '' ? parseFloat(v).toFixed(dec) : '--';
+        }
+
+        function updateCards(device) {
+            // 感測器數據在 device.sensors 下
+            const s = device.sensors || device;
+
+            document.getElementById('val-co2').textContent  = fmt(s.co2,  0);
+            document.getElementById('val-pm10').textContent = fmt(s.pm10 != null ? s.pm10 * 0.1 : null, 1);
+            document.getElementById('val-hcho').textContent = fmt(s.hcho, 1);
+            document.getElementById('val-co').textContent   = fmt(s.co,   2);
+            document.getElementById('val-pm25').textContent = fmt(s.pm25 != null ? s.pm25 * 0.1 : null, 1);
+            document.getElementById('val-tvoc').textContent = fmt(s.tvoc, 0);
+
+            document.getElementById('val-temperature').textContent =
+                s.temperature != null ? `${parseFloat(s.temperature).toFixed(1)}°C` : '--°C';
+            document.getElementById('val-humidity').textContent =
+                s.humidity != null ? `${parseFloat(s.humidity).toFixed(0)}%` : '--%';
+
+            document.getElementById('current-device-alias').textContent =
+                device.alias || device.name || device.uuid || '未知裝置';
+
+            const statusEl = document.getElementById('device-status');
+            // status === 'y' 表示在線（原始 Python client 邏輯）
+            const isOnline = device.status === 'y' || device.online === true || device.online === 1;
+            statusEl.textContent = isOnline ? '● 線上' : '● 離線';
+            statusEl.className   = isOnline
+                ? 'text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600'
+                : 'text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500';
+            statusEl.classList.remove('hidden');
+        }
+
+        // ===== UI: sidebar devices =====
+        function updateSidebarDevices() {
+            const list = document.getElementById('sidebar-nav-list');
+            if (!devices.length) {
+                list.innerHTML = '<li><div class="px-4 py-3 text-slate-500 text-sm">無可用裝置</div></li>';
+                return;
+            }
+            list.innerHTML = devices.map((d, i) => {
+                const name    = d.alias || d.name || d.uuid || `裝置 ${i + 1}`;
+                const active  = i === activeDeviceIdx;
+                const classes = active
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white group';
+                return `<li>
+                    <a href="#" data-idx="${i}"
+                        class="device-link flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${classes}">
+                        <i data-lucide="cpu" size="20" class="${active ? '' : 'group-hover:text-blue-400'}"></i>
+                        <span class="font-${active ? 'bold' : 'medium'} truncate">${name}</span>
+                    </a>
+                </li>`;
+            }).join('');
+
+            lucide.createIcons();
+
+            document.querySelectorAll('.device-link').forEach(link => {
+                link.addEventListener('click', e => {
+                    e.preventDefault();
+                    selectDevice(parseInt(link.dataset.idx));
+                });
+            });
+        }
+
+        function selectDevice(idx) {
+            activeDeviceIdx = idx;
+            updateSidebarDevices();
+            updateCards(devices[idx]);
+            updateChartFromAPI();
+        }
+
+        // ===== Chart =====
+        const ctx = document.getElementById('iaq-chart').getContext('2d');
+
+        function makeGradient(color) {
+            const g = ctx.createLinearGradient(0, 0, 0, 280);
+            g.addColorStop(0, color + '33');
+            g.addColorStop(1, color + '00');
+            return g;
+        }
+
+        const meta0 = POLLUTANT_META['CO2'];
+        const chart  = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: meta0.label,
+                    data: [],
+                    borderColor: meta0.color,
+                    backgroundColor: makeGradient(meta0.color),
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    pointHoverBackgroundColor: meta0.color,
+                    tension: 0.45,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        titleColor: '#94a3b8',
+                        bodyColor: '#f8fafc',
+                        bodyFont: { weight: 'bold', size: 13 },
+                        padding: 12,
+                        cornerRadius: 12,
+                        displayColors: false,
+                    },
+                    annotation: {
+                        annotations: {
+                            threshold: {
+                                type: 'line',
+                                yMin: THRESHOLDS['CO2'],
+                                yMax: THRESHOLDS['CO2'],
+                                borderColor: 'rgba(239,68,68,0.85)',
+                                borderWidth: 2,
+                                borderDash: [6, 4],
+                                label: {
+                                    content: `警戒線 ${THRESHOLDS['CO2']} ${meta0.unit}`,
+                                    display: true,
+                                    position: 'end',
+                                    yAdjust: -14,
+                                    backgroundColor: 'rgba(239,68,68,0.08)',
+                                    color: 'rgb(239,68,68)',
+                                    font: { size: 11, weight: 'bold', family: "'Noto Sans TC', sans-serif" },
+                                    padding: { x: 8, y: 4 },
+                                    borderRadius: 6,
+                                }
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#94a3b8', font: { size: 11, weight: 'bold' }, maxTicksLimit: 8 },
+                        border: { display: false },
+                    },
+                    y: {
+                        grid: { color: '#f1f5f9', lineWidth: 1 },
+                        ticks: { color: '#94a3b8', font: { size: 11, weight: 'bold' }, maxTicksLimit: 5 },
+                        border: { display: false },
+                        grace: '15%',
+                    }
+                }
+            }
+        });
+
+        async function updateChartFromAPI() {
+            if (!devices.length) return;
+            const device = devices[activeDeviceIdx];
+            if (!device || !device.uuid) return;
+
+            const { from, to, group } = getHistoryTimeRange(currentRange);
+            try {
+                const histories = await fetchHistory(device.uuid, from, to, group);
+                historyData = histories || [];
+                applyHistoryToChart(historyData);
+            } catch (e) {
+                console.error('History fetch error:', e);
+            }
+        }
+
+        function applyHistoryToChart(histories) {
+            const meta   = POLLUTANT_META[currentPollutant];
+            const apiKey = meta.apiKey;
+
+            // 不管有無資料，先更新外觀與警戒線
+            chart.data.datasets[0].label = meta.label;
+            chart.data.datasets[0].borderColor = meta.color;
+            chart.data.datasets[0].backgroundColor = makeGradient(meta.color);
+            chart.data.datasets[0].pointHoverBackgroundColor = meta.color;
+
+            const t   = THRESHOLDS[currentPollutant];
+            const ann = chart.options.plugins.annotation.annotations.threshold;
+            ann.yMin = t;
+            ann.yMax = t;
+            ann.label.content = `警戒線 ${t} ${meta.unit}`;
+
+            if (histories && histories.length) {
+                const labels = histories.map(h => {
+                    const ts = h.tick || h.time || h.timestamp || 0;
+                    const d  = new Date(ts * 1000);
+                    if (currentRange === 1) {
+                        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                    }
+                    return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:00`;
+                });
+
+                const isPM = currentPollutant === 'PM10' || currentPollutant === 'PM2.5';
+                const data = histories.map(h => {
+                    const v = h[apiKey];
+                    if (v == null || v === '') return null;
+                    return isPM ? parseFloat(v) * 0.1 : parseFloat(v);
+                });
+
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = data;
+            }
+
+            chart.update('active');
+        }
+
+        // ===== Tab switching =====
+        function setActivePollutant(btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                b.classList.add('border-slate-200', 'text-slate-500');
+            });
+            btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+            btn.classList.remove('border-slate-200', 'text-slate-500');
+        }
+
+        function setActiveRange(btn) {
+            document.querySelectorAll('.range-btn').forEach(b => {
+                b.classList.remove('bg-white', 'text-blue-600', 'shadow-sm');
+                b.classList.add('text-slate-500');
+            });
+            btn.classList.add('bg-white', 'text-blue-600', 'shadow-sm');
+            btn.classList.remove('text-slate-500');
+        }
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentPollutant = btn.dataset.pollutant;
+                setActivePollutant(btn);
+                applyHistoryToChart(historyData); // 一定執行，至少更新警戒線
+                updateChartFromAPI();
+            });
+        });
+
+        document.querySelectorAll('.range-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentRange = parseInt(btn.dataset.range);
+                setActiveRange(btn);
+                updateChartFromAPI();
+            });
+        });
+
+        setActivePollutant(document.querySelector('[data-pollutant="CO2"]'));
+        setActiveRange(document.querySelector('[data-range="1"]'));
+
+        // ===== CSV download =====
+        document.getElementById('btn-download-csv').addEventListener('click', () => {
+            if (!historyData || !historyData.length) {
+                alert('尚無資料可下載，請先載入歷史資料');
+                return;
+            }
+            const meta = POLLUTANT_META[currentPollutant];
+            const rows = [['時間', meta.label]];
+            historyData.forEach(h => {
+                const ts = h.tick || h.time || h.timestamp || 0;
+                const d  = new Date(ts * 1000);
+                const label = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                const isPM = currentPollutant === 'PM10' || currentPollutant === 'PM2.5';
+                const rawVal = h[meta.apiKey];
+                const csvVal = (rawVal != null && rawVal !== '' && isPM) ? (parseFloat(rawVal) * 0.1).toFixed(1) : (rawVal ?? '');
+                rows.push([label, csvVal]);
+            });
+            const csv = rows.map(r => r.join(',')).join('\n');
+            const a   = document.createElement('a');
+            a.href     = 'data:text/csv;charset=utf-8,' + encodeURIComponent('﻿' + csv);
+            a.download = `IAQ_${currentPollutant}_${currentRange}d.csv`;
+            a.click();
+        });
+
+        // ===== Refresh button =====
+        document.getElementById('btn-refresh').addEventListener('click', async () => {
+            if (!token) return;
+            const icon = document.querySelector('#btn-refresh i[data-lucide="refresh-cw"]');
+            if (icon) icon.classList.add('spin');
+            try {
+                const fresh = await fetchDevices();
+                if (fresh && fresh.length) {
+                    devices = fresh;
+                    updateSidebarDevices();
+                    updateCards(devices[activeDeviceIdx]);
+                    await updateChartFromAPI();
+                }
+            } catch (e) {
+                console.error('Refresh error:', e);
+            } finally {
+                if (icon) setTimeout(() => icon.classList.remove('spin'), 600);
+            }
+        });
+
+        // ===== Load dashboard =====
+        async function loadDashboard() {
+            try {
+                const devList = await fetchDevices();
+                if (!devList || !devList.length) {
+                    console.warn('No devices returned');
+                    updateSidebarDevices();
+                    return;
+                }
+                devices = devList;
+                activeDeviceIdx = 0;
+                updateSidebarDevices();
+                updateCards(devices[0]);
+                await updateChartFromAPI();
+
+                if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+                autoRefreshTimer = setInterval(async () => {
+                    try {
+                        const fresh = await fetchDevices();
+                        if (fresh && fresh.length) {
+                            devices = fresh;
+                            updateCards(devices[activeDeviceIdx]);
+                        }
+                    } catch (e) {
+                        console.error('Auto-refresh error:', e);
+                    }
+                }, 60000);
+            } catch (e) {
+                console.error('loadDashboard error:', e);
+                logout();
+            }
+        }
+
+        // ===== Init =====
+        async function init() {
+            if (token) {
+                document.getElementById('login-modal').classList.add('hidden');
+                try {
+                    await loadDashboard();
+                } catch (e) {
+                    logout();
+                }
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
