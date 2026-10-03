@@ -1,0 +1,15 @@
+{
+  "name": "newtaipeiiaq",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "worker-mailer": "^1.2.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.146.0"
+  }
+}

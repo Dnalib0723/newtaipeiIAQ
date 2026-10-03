@@ -5,5 +5,24 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
+  },
+  // 每 10 分鐘檢查一次所有裝置的 CO2，詳見 src/alerts.js
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  },
+  // 記錄每台裝置「從什麼時候開始超標 / 上次寄信時間」。
+  // id 用「wrangler kv namespace create ALERT_KV」建立後貼過來，見 DEPLOY.md。
+  "kv_namespaces": [
+    { "binding": "ALERT_KV", "id": "3e83baad9bff45c889804dfaf6747947" }
+  ],
+  // 非機密參數，改這裡不用重新設定 secret，重新 deploy 就生效
+  "vars": {
+    "CO2_THRESHOLD_PPM": "1000",
+    "CO2_EXCEED_MINUTES": "60",
+    "CO2_REPEAT_MINUTES": "60",
+    // 只監控這些裝置（比對側邊欄顯示的名稱/別名或 UUID，不分大小寫），
+    // 逗號分隔可填多台，例如 "HAC_01_127,HAC_02_xxx,HAC_03_xxx"。
+    // 留空字串 "" 的話會改回監控全部裝置。
+    "ALERT_DEVICE_MATCH": "HAC_01_127"
   }
 }

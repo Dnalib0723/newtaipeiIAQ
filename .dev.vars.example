@@ -1,0 +1,18 @@
+## 本機 `wrangler dev` 用的機密變數範例
+## 複製成 .dev.vars（已在 .gitignore 排除，不會進版控）後填自己的值。
+## 線上環境請用 `wrangler secret put <NAME>` 設定，不要寫進這個檔案後 commit。
+
+# 給 Cron 排程登入用的 EcoBear 帳密（跟你平常登入儀表板用的帳密一樣）
+EB_EMAIL=you@example.com
+EB_PASSWORD=your-ecobear-password
+
+# 寄告警信用的 Gmail 帳號 + App Password（不是登入密碼！）
+# 申請方式：Google 帳戶 → 安全性 → 兩步驟驗證（需先開啟）→ 應用程式密碼
+GMAIL_USER=you@gmail.com
+GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
+
+# 告警信要寄到哪個信箱
+ALERT_EMAIL_TO=you@gmail.com
+
+# 選填：手動測試 /api/admin/check-alerts 用的保護金鑰，不設就永遠回 404
+ADMIN_KEY=
